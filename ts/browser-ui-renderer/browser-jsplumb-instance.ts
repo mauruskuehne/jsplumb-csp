@@ -137,6 +137,93 @@ export function registerEndpointRenderer<C>(name:string, fns:EndpointHelperFunct
     endpointMap[name] = fns
 }
 
+const STYLE_ATTRIBUTE = "style"
+
+function splitStyleDeclarations(style:string):Array<string> {
+    const declarations:Array<string> = []
+    let current = "",
+        quote:string = null,
+        parenDepth = 0
+
+    for (let i = 0; i < style.length; i++) {
+        const c = style.charAt(i)
+
+        if (quote != null) {
+            current += c
+            if (c === quote && style.charAt(i - 1) !== "\\") {
+                quote = null
+            }
+        } else if (c === "\"" || c === "'") {
+            quote = c
+            current += c
+        } else if (c === "(") {
+            parenDepth++
+            current += c
+        } else if (c === ")") {
+            parenDepth = Math.max(0, parenDepth - 1)
+            current += c
+        } else if (c === ";" && parenDepth === 0) {
+            declarations.push(current)
+            current = ""
+        } else {
+            current += c
+        }
+    }
+
+    if (current.length > 0) {
+        declarations.push(current)
+    }
+
+    return declarations
+}
+
+function splitStyleProperty(declaration:string):{name:string, value:string} {
+    let quote:string = null,
+        parenDepth = 0
+
+    for (let i = 0; i < declaration.length; i++) {
+        const c = declaration.charAt(i)
+
+        if (quote != null) {
+            if (c === quote && declaration.charAt(i - 1) !== "\\") {
+                quote = null
+            }
+        } else if (c === "\"" || c === "'") {
+            quote = c
+        } else if (c === "(") {
+            parenDepth++
+        } else if (c === ")") {
+            parenDepth = Math.max(0, parenDepth - 1)
+        } else if (c === ":" && parenDepth === 0) {
+            return {
+                name: declaration.substring(0, i).trim(),
+                value: declaration.substring(i + 1).trim()
+            }
+        }
+    }
+
+    return null
+}
+
+function applyStyleAttribute(el:Element, style:string):void {
+    const elementStyle = (el as HTMLElement | SVGElement).style
+
+    if (elementStyle == null) {
+        return
+    }
+
+    splitStyleDeclarations(style || "").forEach(declaration => {
+        const property = splitStyleProperty(declaration)
+        if (property != null && property.name.length > 0) {
+            const importantMatch = /\s*!important\s*$/i.exec(property.value),
+                value = importantMatch != null ? property.value.substring(0, importantMatch.index).trim() : property.value,
+                priority = importantMatch != null ? "important" : ""
+
+            elementStyle.setProperty(property.name, value, priority)
+        }
+    })
+}
+
 /**
  * @internal
  * @param evt
@@ -623,7 +710,11 @@ export class BrowserJsPlumbInstance extends JsPlumbInstance<{E:Element}> {
      * @public
      */
     setAttribute(el:Element, name:string, value:string):void {
-        el.setAttribute(name, value)
+        if (name === STYLE_ATTRIBUTE) {
+            applyStyleAttribute(el, value)
+        } else {
+            el.setAttribute(name, value)
+        }
     }
 
     /**
@@ -646,7 +737,11 @@ export class BrowserJsPlumbInstance extends JsPlumbInstance<{E:Element}> {
      */
     setAttributes(el:Element, atts:Record<string, string>) {
         for (let i in atts) {
-            el.setAttribute(i, atts[i])
+            if (i === STYLE_ATTRIBUTE) {
+                applyStyleAttribute(el, atts[i])
+            } else {
+                el.setAttribute(i, atts[i])
+            }
         }
     }
 
