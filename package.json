@@ -1,6 +1,6 @@
 {
   "private": true,
-  "version": "6.2.10",
+  "version": "7.0.0",
   "workspaces": [
     "ts/*"
   ],
@@ -51,6 +51,7 @@
     "@rollup/plugin-babel": "^5.2.1",
     "@rollup/plugin-commonjs": "^15.0.0",
     "@rollup/plugin-node-resolve": "^9.0.0",
+    "@types/node": "14.18.63",
     "babel-loader": "^8.0.6",
     "rollup": "^2.26.11",
     "rollup-plugin-cleanup": "^3.2.1",
